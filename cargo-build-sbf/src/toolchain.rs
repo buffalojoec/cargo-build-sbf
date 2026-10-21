@@ -113,7 +113,7 @@ pub fn validate_platform_tools_version(requested_version: &str, builtin_version:
 
     let requested_downloadable_version = downloadable_version(requested_version);
     for v in installed_versions {
-        if requested_semver <= semver::Version::parse(&semver_version(&v)).unwrap() {
+        if semver::Version::parse(&semver_version(&v)).is_ok_and(|v| requested_semver <= v) {
             return requested_downloadable_version;
         }
     }
