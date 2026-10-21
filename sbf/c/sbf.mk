@@ -18,10 +18,16 @@ OS := $(shell uname)
 LLVM_DIR = $(LOCAL_PATH)../dependencies/platform-tools/llvm
 LLVM_SYSTEM_INC_DIRS := $(LLVM_DIR)/lib/clang/18/include
 
+ifeq ($(filter $(SBPF_CPU),v0 v1 v2 v3),)
+$(error SBPF_CPU must be v0, v1, v2 or v3, got $(SBPF_CPU))
+endif
+
 ifeq "$(SBPF_CPU)" "v1"
 TARGET_NAME := sbpfv1
 else ifeq "$(SBPF_CPU)" "v2"
 TARGET_NAME := sbpfv2
+else ifeq "$(SBPF_CPU)" "v3"
+TARGET_NAME := sbpfv3
 else
 TARGET_NAME := sbpf
 endif
@@ -52,10 +58,12 @@ C_FLAGS := \
   $(addprefix -I,$(STD_INC_DIRS)) \
   $(addprefix -I,$(INC_DIRS)) \
 
-ifeq ($(SOL_SBPFV3),1)
+ifeq "$(SBPF_CPU)" "v3"
 C_FLAGS := \
   $(C_FLAGS) \
   -DSOL_SBPFV3=1
+else ifeq ($(SOL_SBPFV3),1)
+$(error SOL_SBPFV3=1 requires SBPF_CPU=v3)
 endif
 
 CXX_FLAGS := \
@@ -92,8 +100,29 @@ SBF_C_FLAGS := \
 SBF_CXX_FLAGS := \
   $(SBF_CXX_FLAGS) \
   -mcpu=v2
+else ifeq "$(SBPF_CPU)" "v3"
+SBF_C_FLAGS := \
+  $(SBF_C_FLAGS) \
+  -mcpu=v3
+
+SBF_CXX_FLAGS := \
+  $(SBF_CXX_FLAGS) \
+  -mcpu=v3
 endif
 
+ifeq "$(SBPF_CPU)" "v3"
+SBF_LLD_FLAGS := \
+  -z notext \
+  -z defs \
+  -shared \
+  --Bdynamic \
+  -Bsymbolic \
+  $(LOCAL_PATH)sbf_v3.ld \
+  --entry entrypoint \
+  -L $(STD_LIB_DIRS) \
+  -lc \
+
+else
 SBF_LLD_FLAGS := \
   -z notext \
   -shared \
@@ -103,6 +132,8 @@ SBF_LLD_FLAGS := \
   -L $(STD_LIB_DIRS) \
   -z max-page-size=4096 \
   -lc \
+
+endif
 
 OBJ_DUMP_FLAGS := \
   --source \
@@ -163,7 +194,7 @@ help:
 	@echo '      OUT_DIR=$(OUT_DIR)'
 	@echo '    - Location of LLVM:'
 	@echo '      LLVM_DIR=$(LLVM_DIR)'
-	@echo '    - Version of SBPF (v0, v1 or v2):'
+	@echo '    - Version of SBPF (v0, v1, v2 or v3):'
 	@echo '      SBPF_CPU=$(SBPF_CPU)'
 	@echo ''
 	@echo 'Usage:'
